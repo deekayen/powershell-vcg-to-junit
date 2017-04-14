@@ -1,3 +1,4 @@
+# https://github.com/solita/powershell-vcg-to-junit
 [cmdletbinding()]
 param(
 	[Parameter(Mandatory=$true)]
@@ -6,9 +7,11 @@ param(
 	[string]
 	$vcgLocation = "C:\Program Files (x86)\VisualCodeGrepper\",
 	[string]
-	$vcgReportLocation = "C:\Temp\vcgresults.xml",
+	$vcgReportLocation = "D:\temp\vcgresults.xml",
 	[string]
-	$unitTestReportLocation = "C:\Temp\vcgtestresults.xml"
+	$unitTestReportLocation = "D:\temp\vcgtestresults.xml",
+	[string]
+	$scanLanguage = "CS"
 )
 # error action to stop
 $erroractionpreference = "Stop"
@@ -52,22 +55,26 @@ function script:Save-VcgReport
     # create tests and failures 
     Foreach($alert in $alerts)
     {
-		# create test
-		[System.XML.XMLElement]$oXMLTestcase=$oXMLRoot.appendChild($oXMLDocument.CreateElement("testcase"))
-		$null = $oXMLTestcase.SetAttribute("classname",$alert.FileName)
-		$null = $oXMLTestcase.SetAttribute("name",$alert.Title)
-		# create failure
-		[System.XML.XMLElement]$oXMLTestFailure=$oXMLTestcase.appendChild($oXMLDocument.CreateElement("failure"))
-		$null = $oXMLTestFailure.SetAttribute("type",$alert.Severity)
-		# create a "stacktrace"
-		[string]$stackTrace = 
+	    if ($alert.Severity -eq "High" -or $alert.Severity -eq "Critical")
+        {
+		    # create test
+		    [System.XML.XMLElement]$oXMLTestcase=$oXMLRoot.appendChild($oXMLDocument.CreateElement("testcase"))
+		    $null = $oXMLTestcase.SetAttribute("classname",$alert.FileName)
+		    $null = $oXMLTestcase.SetAttribute("name",$alert.Title)
+
+		    # create failure
+		    [System.XML.XMLElement]$oXMLTestFailure=$oXMLTestcase.appendChild($oXMLDocument.CreateElement("failure"))
+		    $null = $oXMLTestFailure.SetAttribute("type",$alert.Severity)
+		    # create a "stacktrace"
+		    [string]$stackTrace = 
 @"
 	Error at file: {0}
 	Codeline: {1}
 	Description: {2}
 "@ -f $alert.FileName, $alert.CodeLine, $alert.Description
-		#store stacktrace
-		$null = $oXMLTestFailure.AppendChild($oXMLDocument.CreateTextNode($stackTrace))
+		    #store stacktrace
+		    $null = $oXMLTestFailure.AppendChild($oXMLDocument.CreateTextNode($stackTrace))
+        }
     }
     # Save File
     $oXMLDocument.Save($script:unitTestReportLocation)
@@ -76,7 +83,7 @@ function script:Save-VcgReport
 
 $currentLocation = $psscriptroot
 cd $vcgLocation
-& .\VisualCodeGrepper.exe -c -t $scanTargetLocation -l CS -x $vcgReportLocation -v | Write-Verbose
+& .\VisualCodeGrepper.exe -c -t $scanTargetLocation -l $scanLanguage -x $vcgReportLocation | Write-Verbose
 cd $currentLocation
 
 Save-VcgReport
